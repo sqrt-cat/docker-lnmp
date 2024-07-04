@@ -1,5 +1,5 @@
 .idea
-mysql/data
-mysql/log
-redis/data
-redis/log
+docker/mysql/data
+docker/mysql/log
+docker/redis/data
+docker/redis/log

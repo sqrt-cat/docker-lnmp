@@ -1,5 +1,5 @@
 <?php
-// 数据库连接配置
+// mysql 是 mysql 容器的 link 名
 $host = 'mysql';
 $dbname = 'foo';
 $user = 'www';

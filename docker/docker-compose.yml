@@ -40,6 +40,7 @@ services:
         <<: *common_config
         container_name: ${CONTAINER_NAME_PHP_FPM}
         extends:
+            # 载入配置模板
             file: common-services.yml
             service: php-tpl
         volumes:
@@ -57,6 +58,7 @@ services:
         <<: *common_config
         container_name: ${CONTAINER_NAME_SWOOLE}
         extends:
+            # 载入配置模板
             file: common-services.yml
             service: php-tpl
         ports:

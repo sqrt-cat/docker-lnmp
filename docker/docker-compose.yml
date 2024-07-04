@@ -1,0 +1,111 @@
+version: '3'
+
+# x- 前缀声明为引用 &foo
+# 可以在别处取值填充 *foo
+x-common-config: &common_config
+    restart: always
+    stdin_open: true
+    tty: true
+
+services:
+    nginx:
+        <<: *common_config
+        container_name: ${CONTAINER_NAME_NGINX} # .env 环境变量
+        # image: nginx:latest # 直接使用原镜像 或 build 定制镜像
+        build: # 如果之前没有生产镜像,可以直接用这个
+          context: ./nginx
+          dockerfile: Dockerfile
+        ports:
+            - 8050:80 # 端口 / 域名映射多站点 自行选择
+            - 8051:81
+            - 8052:82
+        volumes:
+            - ./nginx/conf/nginx.conf:/etc/nginx/nginx.conf # 主配置
+            - ./nginx/conf/proxy.conf:/etc/nginx/proxy.conf # 代理配置
+            - ./nginx/conf/fastcgi.conf:/etc/nginx/fastcgi.conf # fastcgi配置
+            - ./nginx/conf/fastcgi_params:/etc/nginx/fastcgi_params # fastcgi配置
+            - ./nginx/conf/pathinfo.conf:/etc/nginx/pathinfo.conf # pathinfo配置
+            - ./nginx/conf/enable-php.conf:/etc/nginx/enable-php.conf # php开启
+            - ./nginx/conf.d:/etc/nginx/conf.d # 放站点hosts的配置
+            - /var/logs:/www/wwwlogs # 日志
+            # 站点挂载
+            - ../sites/default:/var/www/default:rw
+            - ../sites/foo:/var/www/foo:rw
+            - ../sites/swoole:/var/www/swoole:rw
+        links:
+          - php-fpm
+          - swoole
+
+    php-fpm:
+        <<: *common_config
+        container_name: ${CONTAINER_NAME_PHP_FPM}
+        extends:
+            file: common-services.yml
+            service: php-tpl
+        volumes:
+            # 站点挂载
+            - ../sites/default:/var/www/default:rw
+            - ../sites/foo:/var/www/foo:rw
+        links:
+            - redis
+            - mysql
+        depends_on:
+            - redis
+            - mysql
+
+    swoole:
+        <<: *common_config
+        container_name: ${CONTAINER_NAME_SWOOLE}
+        extends:
+            file: common-services.yml
+            service: php-tpl
+        ports:
+            - 9501:9501
+        volumes:
+            # 站点挂载
+            - ../sites/swoole:/var/www/swoole:rw
+        working_dir: /var/www/swoole
+        entrypoint: ["php", "server.php"] # 覆写 entrypoint 启动 swoole server 阻塞模式可以防止容器退出
+        links:
+            - redis
+            - mysql
+        depends_on:
+            - redis
+            - mysql
+
+    redis:
+        <<: *common_config
+        container_name: ${CONTAINER_NAME_REDIS}
+        image: redis:latest
+        ports:
+            - 6397:6379
+        volumes:
+            - ./redis/log:/var/log/redis # 日志目录
+            - ./redis/data:/data # 数据目录 redis.conf->dir
+            - ./redis/conf/redis.conf:/etc/redis/redis.conf # 配置文件
+        command: redis-server /etc/redis/redis.conf # 使用自定义配置文件启动服务
+
+    mysql:
+        <<: *common_config
+        container_name: ${CONTAINER_NAME_MYSQL}
+        image: mysql:latest
+        ports:
+            - 3360:3306
+        volumes:
+            - ./mysql/log:/var/log/mysql # 挂载日志 为了保存二进制日志
+            - ./mysql/data:/var/lib/mysql # 挂载数据 一定要外挂出来 不然容器销毁数据全无 提桶跑路
+            - ./mysql/my.cnf:/etc/my.cnf # 自定义配置文件 可配置 datadir
+            - ./mysql/conf.d:/etc/mysql/conf.d # 额外的配置文件目录
+        environment:
+            MYSQL_USER: www # 普通用户
+            MYSQL_PASSWORD: 123456 # 普通用户密码
+            MYSQL_ROOT_PASSWORD: 123456 # root密码
+            MYSQL_DATABASE: test # 默认新建数据库名称
+        
+    node: #node.js 个人目前主要用于编译
+        <<: *common_config
+        container_name: ${CONTAINER_NAME_NODE}
+        platform: linux/x86_64
+        image: node
+        volumes:
+            - ../sites:/root/sites #项目

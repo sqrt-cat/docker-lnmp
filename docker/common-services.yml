@@ -1,0 +1,21 @@
+# 抽出来的服务配置模板 只用来被 extends 载入 不会创建额外容器
+services:
+    php-tpl:
+        restart: always
+        stdin_open: true
+        tty: true
+        # image: php:8.2-fpm
+        image: sqrtcat/php-swoole:0.0.2
+        # platform: linux/amd64
+        # platform: linux/x86_64
+        # build: #自定义镜像构建
+        #   context: ./php
+        #   dockerfile: Dockerfile
+        ports:
+            - :9000 # php-fpm 的默认端口 配置在 /usr/local/etc/php-fpm.d/zz-docker.conf 中
+        volumes:
+            - /etc/localtime:/etc/localtime:ro # 修正时间 centos
+            - /etc/timezone:/etc/timezone:ro # 修正时区 centos
+            - ./php/conf/php.ini:/usr/local/etc/php/php.ini # php.ini
+            - ./php/conf/conf.d/docker-php-z-exts.ini:/usr/local/etc/php/conf.d/docker-php-z-exts.ini # 额外加载的扩展
+            - ./php/conf/php-fpm.d/www.conf:/usr/local/etc/php-fpm.d/www.conf # php-fpm 进程池的相关配置
